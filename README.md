@@ -16,7 +16,7 @@ How it is built: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | Path | What it is |
 |---|---|
-| `platform/prReviewer.prs` | Export of the model `users.admin.models.prReviewer`: variables, 11 functions, the event and the polling binding. Definitions only, with no data or credentials |
+| `platform/prReviewer.prs` | Export of the model `users.admin.models.prReviewer`: variables, 12 functions, the event and the polling binding. Definitions only, with no data or credentials |
 | `platform/prReviewCost.prs` | Export of the dashboard `users.admin.dashboards.prReviewCost` |
 | `runner/pr-review.sh` | Runner script: prepares a git worktree and runs Claude Code as the `reviewer` user |
 | `prompts/architecture-system.md` | Reviewer instructions (the model's `system` prompt) |
@@ -121,7 +121,8 @@ Never put a token in "Additional HTTP Headers": that field is stored and exporte
 | Stop everything | `config.enabled = false` |
 | Keep reviewing but stop posting | `config.postComments = false` |
 | Stop requesting changes | `config.requestChanges = false` |
-| Review a PR again | Delete its row in `ledger`; the next cycle reviews it |
+| Review one PR now | Call the model function `reviewPr` with `prId` (and `force = true` to review an already reviewed commit again). Works for any open PR, whatever its issue type and size, even while polling is off |
+| Review a PR again on the next cycle | Delete its row in `ledger` |
 | Change the model or depth | `config.model` (`opus`, `sonnet`, …) and `config.effort` (`low` to `max`) |
 | Allow larger PRs | `config.maxChangedLines`, `config.maxChangedFiles` |
 | Speed up or slow down | `config.maxReviewsPerCycle`, or the binding period |

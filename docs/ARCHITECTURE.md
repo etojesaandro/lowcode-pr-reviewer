@@ -35,7 +35,7 @@ flowchart LR
 
 | Piece | Kind | Role |
 |---|---|---|
-| `users.admin.models.prReviewer` | Absolute model | All of the logic: 11 Java model functions, 5 variables, 1 event, 1 binding |
+| `users.admin.models.prReviewer` | Absolute model | All of the logic: 12 Java model functions, 5 variables, 1 event, 1 binding |
 | `users.admin.devices.bitbucket` | HTTP device | Bitbucket Cloud API: base address and credentials (API token in the secret password field) |
 | `users.admin.devices.jira` | HTTP device | Jira Cloud API: issue type and summary |
 | `users.admin.dashboards.prReviewCost` | Web dashboard (grid) | Cost and token statistics |
@@ -88,6 +88,11 @@ Filtering order, from cheapest to most expensive:
 5. **Cycle limit.** Once `maxReviewsPerCycle` reviews are done, the remaining PRs wait for the next cycle.
 6. **Size.** At most `maxChangedLines` (500) and `maxChangedFiles` (20), not counting lock files, `*.d.ts` and `generated/`. Larger PRs are SKIPPED as "Too large".
 
+**Manual trigger.** `reviewPr(prId, force)` reviews one open PR on demand, even while polling is
+off. It skips the issue type and size checks, because a person chose the PR. It runs through
+`poll()`, so it waits for a running cycle and the ledger still has a single writer. A commit
+that was already reviewed (DONE or DRY_RUN) is refused unless `force` is true.
+
 The `RUNNING` row is written before Claude starts. A crash therefore never leads to the same
 commit being reviewed twice; the next cycle marks the row `FAILED` instead.
 
@@ -107,7 +112,8 @@ commit being reviewed twice; the next cycle marks the row `FAILED` instead.
 
 | Function | Purpose |
 |---|---|
-| `poll` | One cycle (see §2) |
+| `poll` | One cycle (see §2); with a `prId` input, reviews only that PR |
+| `reviewPr` | Manual trigger: reviews one open PR now, whatever its issue type and size, and returns its ledger row |
 | `openPrs` | Open PRs of the repository |
 | `issueOf` | Jira issue type and summary |
 | `sizeOf` | Changed lines and files from the Bitbucket diffstat |

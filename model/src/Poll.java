@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
 
 /**
  * One polling cycle: reviews every open PR whose Jira issue has a configured bug type and whose
- * diff is within the configured size, once per PR head commit. The ledger row is written before
+ * diff is within the configured size, once per PR head commit. Called with a prId (by reviewPr),
+ * it reviews only that open PR, whatever its issue type and size; a commit already reviewed is
+ * refused unless force is set. The ledger row is written before
  * the review starts, so a crash never causes a second review of the same commit; a leftover
  * RUNNING row is marked FAILED on the next cycle.
  * The ledger is saved as a copy each time: a stored table becomes immutable, the working one not.
@@ -46,9 +48,20 @@ public class %ScriptClassNamePattern% implements FunctionImplementation {
     int skipped = 0;
     int failed = 0;
     String error = null;
+    DataRecord in = parameters.getRecordCount() == 0 ? null : parameters.rec();
+    int requested = in == null || in.getValue("prId") == null ? 0 : in.getInt("prId");
+    boolean force = in != null && Boolean.TRUE.equals(in.getBoolean("force"));
     try {
       DataTable prs = con.callFunction("openPrs", caller);
       open = prs.getRecordCount();
+      if (requested > 0) {
+        if (manual(con, caller, cfg, ledger, keys, prs, requested, force)) {
+          reviewed++;
+        } else {
+          failed++;
+        }
+        return new SimpleDataTable(def.getOutputFormat(), open, reviewed, skipped, failed);
+      }
       for (DataRecord pr : prs) {
         int id = pr.getInt("prId");
         String commit = pr.getString("commit");
@@ -104,6 +117,46 @@ public class %ScriptClassNamePattern% implements FunctionImplementation {
     return new SimpleDataTable(def.getOutputFormat(), open, reviewed, skipped, failed);
   }
 
+  /** Reviews one PR on request, skipping the issue type and size filters. */
+  private static boolean manual(Context con, CallerController caller, DataRecord cfg,
+      DataTable ledger, Pattern keys, DataTable prs, int id, boolean force)
+      throws ContextException {
+    DataRecord pr = null;
+    for (DataRecord candidate : prs) {
+      if (candidate.getInt("prId") == id) {
+        pr = candidate;
+      }
+    }
+    if (pr == null) {
+      throw new ContextException("PR " + id + " is not open");
+    }
+    String commit = pr.getString("commit");
+    for (int i = ledger.getRecordCount() - 1; i >= 0; i--) {
+      DataRecord row = ledger.getRecord(i);
+      if (row.getInt("prId") != id || !commit.equals(row.getString("commit"))) {
+        continue;
+      }
+      String status = row.getString("status");
+      if (!force && ("DONE".equals(status) || "DRY_RUN".equals(status))) {
+        throw new ContextException("PR " + id + " was already reviewed at commit " + commit
+            + " (" + status + "); call it with force=true to review it again");
+      }
+      ledger.removeRecord(i);
+    }
+    String key = jiraKey(keys, pr.getString("title"), pr.getString("source"));
+    String type = null;
+    String summary = null;
+    if (key != null) {
+      DataRecord issue = con.callFunction("issueOf", caller, key).rec();
+      if (Boolean.TRUE.equals(issue.getBoolean("found"))) {
+        type = issue.getString("issueType");
+        summary = issue.getString("summary");
+      }
+    }
+    DataRecord size = con.callFunction("sizeOf", caller, id).rec();
+    return review(con, caller, cfg, ledger, pr, key, type, summary, size);
+  }
+
   private static boolean review(Context con, CallerController caller, DataRecord cfg,
       DataTable ledger, DataRecord pr, String key, String type, String summary, DataRecord size)
       throws ContextException {
@@ -115,7 +168,8 @@ public class %ScriptClassNamePattern% implements FunctionImplementation {
         .replace("{title}", pr.getString("title")).replace("{source}", pr.getString("source"))
         .replace("{destination}", pr.getString("destination"))
         .replace("{commit}", pr.getString("commit")).replace("{prUrl}", pr.getString("url"))
-        .replace("{jiraKey}", key).replace("{issueType}", type)
+        .replace("{jiraKey}", key == null ? "none" : key)
+        .replace("{issueType}", type == null ? "unknown" : type)
         .replace("{jiraSummary}", summary == null ? "" : summary);
     DataRecord result = con.callFunction("runReview", caller, pr.getInt("prId"),
         pr.getString("commit"), pr.getString("destination"), prompt(prompts, "system"), task)
