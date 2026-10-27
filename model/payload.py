@@ -71,7 +71,7 @@ FUNCTIONS = [
             f("apiDurationMs", "L", "API Duration, ms", defaultValue=0),
             f("permissionDenials", "I", "Denied Tool Calls", defaultValue=0),
             f("sessionId", "S", "Session Id", **N), f("error", "S", "Error", **N)]), True, None),
-    ("poll", "One polling cycle: review new bug PRs once per head commit", "Poll", "admin",
+    ("poll", "One polling cycle: review each new bug PR once", "Poll", "admin",
      fmt([f("prId", "I", "Only This PR", **N), f("force", "B", "Even If Already Reviewed",
                                                  defaultValue=False)], 0, 1),
      fmt([f("openPrs", "I", "Open PRs"), f("reviewed", "I", "Reviewed"),

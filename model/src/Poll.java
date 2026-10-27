@@ -14,11 +14,11 @@ import java.util.regex.Pattern;
 
 /**
  * One polling cycle: reviews every open PR whose Jira issue has a configured bug type and whose
- * diff is within the configured size, once per PR head commit. Called with a prId (by reviewPr),
- * it reviews only that open PR, whatever its issue type and size; a commit already reviewed is
- * refused unless force is set. The ledger row is written before
- * the review starts, so a crash never causes a second review of the same commit; a leftover
- * RUNNING row is marked FAILED on the next cycle.
+ * diff is within the configured size, once per PR: later pushes are not reviewed again. Called
+ * with a prId (by reviewPr), it reviews only that open PR, whatever its issue type and size; a
+ * commit already reviewed is refused unless force is set. The ledger row is written before the
+ * review starts, so a crash never causes a second review; a leftover RUNNING row is marked
+ * FAILED on the next cycle.
  * The ledger is saved as a copy each time: a stored table becomes immutable, the working one not.
  *
  * @author Alexander Sidorov
@@ -64,9 +64,7 @@ public class %ScriptClassNamePattern% implements FunctionImplementation {
       }
       for (DataRecord pr : prs) {
         int id = pr.getInt("prId");
-        String commit = pr.getString("commit");
-        if (!destinations.matcher(pr.getString("destination")).matches()
-            || find(ledger, id, commit) != null) {
+        if (!destinations.matcher(pr.getString("destination")).matches() || seen(ledger, id)) {
           continue;
         }
         String key = jiraKey(keys, pr.getString("title"), pr.getString("source"));
@@ -282,13 +280,14 @@ public class %ScriptClassNamePattern% implements FunctionImplementation {
         .setValue("error", error);
   }
 
-  private static DataRecord find(DataTable ledger, int id, String commit) {
+  /** A PR with any ledger row, at any commit, was already checked and is not looked at again. */
+  private static boolean seen(DataTable ledger, int id) {
     for (DataRecord row : ledger) {
-      if (row.getInt("prId") == id && commit.equals(row.getString("commit"))) {
-        return row;
+      if (row.getInt("prId") == id) {
+        return true;
       }
     }
-    return null;
+    return false;
   }
 
   private static String jiraKey(Pattern keys, String title, String source) {

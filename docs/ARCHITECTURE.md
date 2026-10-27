@@ -58,7 +58,7 @@ sequenceDiagram
   T->>P: config.enabled
   P->>P: RUNNING ledger rows from a crash become FAILED
   P->>BB: open PRs (paginated)
-  loop each PR whose (PR, head commit) is not in the ledger
+  loop each PR that is not in the ledger yet
     P->>J: issue type of the Jira key from the title or branch
     alt not Bug / Performance Issue, no key, or too large
       P->>P: ledger SKIPPED (with the reason)
@@ -81,7 +81,7 @@ sequenceDiagram
 
 Filtering order, from cheapest to most expensive:
 
-1. **Duplicate check.** The PR + head commit is already in the ledger, so the PR is skipped silently. A new push gives a new commit, and the PR is reviewed again.
+1. **Duplicate check.** The PR already has a ledger row (reviewed, skipped or failed, at any commit), so it is skipped silently. Each PR is checked once; later pushes are not reviewed again. Use `reviewPr` to review it after changes.
 2. **Destination.** The PR's target branch must match `destinationRegex`.
 3. **Jira key.** The first key found in the title, then in the source branch. If there is none, or Jira doesn't know it, the PR is SKIPPED.
 4. **Issue type.** It must be in `bugTypes` (`Bug,Performance Issue`). Otherwise the PR is SKIPPED with the type recorded.

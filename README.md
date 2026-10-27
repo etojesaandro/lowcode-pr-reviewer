@@ -4,7 +4,7 @@ An IoT Platform low-code solution that reviews Bitbucket pull requests with Clau
 
 - Every 5 minutes it finds open PRs whose Jira issue is a **Bug** or **Performance Issue** and
   whose diff is at most 500 lines in 20 files.
-- It reviews each PR head commit **once**, with Claude Code 
+- It reviews each PR **once**, with Claude Code; later pushes to the PR are not reviewed again
 - It posts the review as a PR comment ending with a signature: agent, exact model, effort,
   every token count, cost, turns, time and PR size.
 - It sets **"Changes requested"** when the review has a MAJOR or BLOCKING finding.
